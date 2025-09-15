@@ -1,0 +1,46 @@
+name: Terraform RG Create
+
+on:
+  workflow_dispatch:   # allows manual run
+  push:
+    branches: ["main"]
+    paths:
+      - "infra/**"
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    env:
+      TF_WORKING_DIR: infra
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_resource_group_name: ${{ vars.RESOURCE_GROUP_NAME }}
+          TF_VAR_location: ${{ vars.LOCATION }}
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_resource_group_name: ${{ vars.RESOURCE_GROUP_NAME }}
+          TF_VAR_location: ${{ vars.LOCATION }}
+        run: terraform apply -auto-approve tfplan
